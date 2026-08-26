@@ -1,0 +1,17 @@
+version: 2
+
+# Dependabot — o que existe para não voltar a acontecer.
+#
+# A 26 de agosto de 2026 estes workflows estavam presos no actions/checkout@v5
+# e no setup-node@v5, quando o major corrente já era o v7. Nada tinha avisado:
+# um workflow com uma major antiga continua a passar durante meses e depois
+# falha no dia em que a GitHub reforma o runtime por baixo dele — um dia que
+# ninguém escolheu, normalmente o dia em que se precisa do CI.
+#
+# Isto transforma esse dia numa pull request.
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    commit-message: { prefix: "ci" }

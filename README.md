@@ -3,6 +3,7 @@
 A terminal expense tracker in Python. You type what you spent, it appends a row
 to a CSV, and it shows you where the money went.
 
+[![CI](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml/badge.svg)](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![30 tests](https://img.shields.io/badge/tests-30-brightgreen)

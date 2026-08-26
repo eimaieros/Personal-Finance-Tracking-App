@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      # Three points across the supported range rather than every version.
+      # 3.10 is the floor the code actually needs (`X | None` in annotations)
+      # and it goes end-of-life in October 2026 — when it does, it comes out
+      # of this list rather than getting pinned around.
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install pytest
+      - run: pytest -q
+
+      # The program reads the ledger on startup, and the sample row shipped in
+      # expenses.csv is deliberately in the old emoji format so the migration
+      # path is exercised by anyone who clones this. If normalise_category
+      # ever stops recognising it, the summary silently loses the row — a
+      # green test suite would not notice, because the tests use tmp_path.
+      #
+      # An empty name ends the input loop, so this runs the whole program
+      # without a terminal and asserts the sample row survived.
+      - name: The shipped ledger still reads
+        run: |
+          saida=$(printf '\n' | python expense_tracker.py)
+          echo "$saida"
+          echo "$saida" | grep -q "25.00 EUR" || {
+            echo "::error::a linha de exemplo em expenses.csv deixou de ser lida"
+            exit 1
+          }
