@@ -6,10 +6,13 @@ to a CSV, and it shows you where the money went.
 [![CI](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml/badge.svg)](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![30 tests](https://img.shields.io/badge/tests-30-brightgreen)
+![52 tests](https://img.shields.io/badge/tests-52-brightgreen)
 
 ```bash
-python expense_tracker.py
+python expense_tracker.py                    # record, then summarise this month
+python expense_tracker.py --summary          # just the summary
+python expense_tracker.py --month 2026-07    # a specific month
+python expense_tracker.py --all              # the whole ledger
 ```
 
 No dependencies to run it. `pytest` for the tests.
@@ -80,13 +83,25 @@ proves the author stopped paying attention. It reports a daily average now.
 A program that reports two currencies for the same number is worse than one that
 reports the wrong one, because you cannot tell which of the two is the mistake.
 
+### The daily average was a number, not an answer
+
+The summary summed the entire file and divided by today's day of the month. That
+is correct for exactly as long as the ledger holds one month. Put six months in
+it and "per day so far" divides half a year of spending by the twenty-sixth of
+August — and the result looks perfectly plausible, which is the part that makes
+it dangerous. A crash tells you something is wrong. This just quietly lies.
+
+The date was already being written to every row since the rewrite. It simply was
+not being read back. The summary is scoped to a month now, `--all` opens it up,
+and the daily average is only printed for the window where it means something.
+
 ---
 
 ## Tests
 
 ```bash
 pip install pytest
-pytest -q          # 30 tests
+pytest -q          # 52 tests
 ```
 
 Every test corresponds to something that was actually broken. A test that could
@@ -107,7 +122,7 @@ Two of them are worth pointing at:
 ```
 expense.py                 the Expense model, the categories, amount parsing
 expense_tracker.py         prompts, the CSV, the summary
-test_expense_tracker.py    30 tests
+test_expense_tracker.py    52 tests
 expenses.csv               the ledger — one sample row, in the old format on
                            purpose, so the migration is visible
 ```
@@ -115,8 +130,7 @@ expenses.csv               the ledger — one sample row, in the old format on
 ## What it still is not
 
 - No editing or deleting a row once written. Append-only, by design at this size.
-- No budgets, no recurring expenses, no multi-currency.
-- No date filtering — the date is stored but the summary covers the whole file.
+- No budgets, no recurring expenses, no multi-currency, no search.
 - The category list is fixed in `expense.py`. Changing a label orphans the rows
   already written under the old one, which is why it is a constant and not a
   prompt.

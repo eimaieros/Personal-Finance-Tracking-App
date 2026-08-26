@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass
 
 # The categories, and the order they are offered in. Kept here rather than in
@@ -34,6 +35,12 @@ class Expense:
     category: str
     amount: float
 
+    # Optional because a ledger written by the first version has no date
+    # column at all, and refusing to read those rows would mean the fix threw
+    # away the data it existed to protect. Rows without one are simply not
+    # counted when a summary is scoped to a month.
+    date: datetime.date | None = None
+
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise InvalidExpense("An expense needs a name.")
@@ -50,7 +57,8 @@ class Expense:
         # euros. A program that reports two currencies for the same number is
         # worse than one that reports the wrong one, because you cannot tell
         # which of the two is the mistake.
-        return f"<Expense: {self.name}, {self.category}, {self.amount:.2f} EUR>"
+        quando = f", {self.date.isoformat()}" if self.date else ""
+        return f"<Expense: {self.name}, {self.category}, {self.amount:.2f} EUR{quando}>"
 
 
 def parse_amount(raw: str) -> float:
@@ -80,3 +88,19 @@ def parse_amount(raw: str) -> float:
     if value <= 0:
         raise InvalidExpense("An amount has to be greater than zero.")
     return value
+
+
+def parse_date(raw: str) -> datetime.date | None:
+    """Read the date column, or admit there isn't one.
+
+    Returns None rather than raising: a row from the first version has three
+    fields and no date, and that row is still a real expense. The only thing a
+    missing date costs is inclusion in a month-scoped summary.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        return None

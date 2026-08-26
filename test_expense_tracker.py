@@ -8,11 +8,14 @@ nothing about the program.
 """
 
 import csv
+import datetime
 
 import pytest
 
-from expense import CATEGORIES, Expense, InvalidExpense, parse_amount
-from expense_tracker import append, normalise_category, read, summarise
+from expense import CATEGORIES, Expense, InvalidExpense, parse_amount, parse_date
+from expense_tracker import (
+    append, in_month, normalise_category, parse_args, parse_month, read, summarise,
+)
 
 
 # ── the bug that corrupted the file ──────────────────────────────────────────
@@ -181,3 +184,144 @@ def test_an_unknown_category_is_still_skipped(tmp_path, capsys):
     ledger.write_text("x,1.0,Crypto\n", encoding="utf-8")
     assert read(ledger) == []
     assert "skipped" in capsys.readouterr().err
+
+
+# ── the summary used to cover a window it never chose ────────────────────────
+
+def _ledger(tmp_path, linhas):
+    p = tmp_path / "expenses.csv"
+    p.write_text("name,amount,category,date\n" + "".join(linhas), encoding="utf-8")
+    return p
+
+
+def test_the_date_column_is_read_back(tmp_path):
+    """It was being written on every row and thrown away on every read."""
+    ledger = _ledger(tmp_path, ["Almoço,12.50,Restaurants,2026-07-14\n"])
+    (lido,) = read(ledger)
+    assert lido.date == datetime.date(2026, 7, 14)
+
+
+def test_a_row_with_no_date_is_still_an_expense(tmp_path):
+    ledger = tmp_path / "expenses.csv"
+    ledger.write_text("Calças,25.0,Clothing\n", encoding="utf-8")
+    (lido,) = read(ledger)
+    assert lido.amount == 25.0
+    assert lido.date is None
+
+
+def test_an_unreadable_date_does_not_lose_the_row(tmp_path):
+    # A corrupt fourth field costs the row its month, not its existence.
+    ledger = _ledger(tmp_path, ["x,1.00,Various,not-a-date\n"])
+    (lido,) = read(ledger)
+    assert lido.amount == 1.0 and lido.date is None
+
+
+def test_a_month_is_a_month(tmp_path):
+    ledger = _ledger(tmp_path, [
+        "junho,10.00,Various,2026-06-30\n",
+        "julho a,20.00,Various,2026-07-01\n",
+        "julho b,5.00,Leisure,2026-07-31\n",
+        "agosto,99.00,Various,2026-08-01\n",
+    ])
+    julho = in_month(read(ledger), 2026, 7)
+    assert sorted(e.amount for e in julho) == [5.0, 20.0]
+
+
+def test_the_summary_defaults_to_one_month(tmp_path, capsys):
+    """THE BUG. Six months in the file, one month in the answer.
+
+    The old version summed everything and divided by today's day of the month.
+    On a file holding half a year that is not a daily average, it is half a
+    year divided by an arbitrary number — and it looked entirely plausible,
+    which is the part that makes it dangerous.
+    """
+    ledger = _ledger(tmp_path, [
+        "março,300.00,Various,2026-03-05\n",
+        "abril,300.00,Various,2026-04-05\n",
+        "julho,40.00,Various,2026-07-05\n",
+    ])
+    summarise(ledger, (2026, 7))
+    out = capsys.readouterr().out
+    assert "40.00" in out
+    assert "300.00" not in out, "another month leaked into this one"
+    assert "July 2026" in out
+
+
+def test_all_time_prints_no_daily_average(tmp_path, capsys):
+    # Printing one over a six-month window would be the same bug wearing a flag.
+    ledger = _ledger(tmp_path, [
+        "março,300.00,Various,2026-03-05\n",
+        "julho,40.00,Various,2026-07-05\n",
+    ])
+    summarise(ledger, None)
+    out = capsys.readouterr().out
+    assert "340.00" in out
+    assert "Per day" not in out
+
+
+def test_an_empty_month_says_so_and_points_at_all(tmp_path, capsys):
+    ledger = tmp_path / "expenses.csv"
+    ledger.write_text("antigo,25.0,Clothing\n", encoding="utf-8")
+    summarise(ledger, (2026, 8))
+    out = capsys.readouterr().out
+    assert "Nothing recorded in August 2026" in out
+    assert "--all" in out, "a dead end is not an answer"
+
+
+def test_undated_rows_are_flagged_not_silently_dropped(tmp_path, capsys):
+    ledger = tmp_path / "expenses.csv"
+    ledger.write_text(
+        "name,amount,category,date\n"
+        "sem data,10.00,Various,\n"
+        "com data,5.00,Various,2026-08-02\n",
+        encoding="utf-8",
+    )
+    summarise(ledger, (2026, 8))
+    out = capsys.readouterr().out
+    assert "5.00" in out
+    assert "1 row(s) with no date" in out
+
+
+# ── the flags ────────────────────────────────────────────────────────────────
+
+def test_no_arguments_means_this_month():
+    hoje = datetime.date.today()
+    month, summary_only = parse_args([])
+    assert month == (hoje.year, hoje.month)
+    assert summary_only is False
+
+
+def test_all_means_no_window():
+    assert parse_args(["--all"]) == (None, False)
+
+
+def test_summary_skips_the_prompts():
+    assert parse_args(["--summary"])[1] is True
+    assert parse_args(["-s"])[1] is True
+
+
+def test_month_takes_a_month():
+    assert parse_args(["--month", "2026-07"])[0] == (2026, 7)
+
+
+def test_help_is_not_an_error():
+    assert parse_args(["--help"]) is None
+    assert parse_args(["-h"]) is None
+
+
+@pytest.mark.parametrize("cru", ["2026-13", "2026-00", "07-2026", "julho", "2026", "", "1800-01"])
+def test_months_that_are_not_months(cru):
+    with pytest.raises(InvalidExpense):
+        parse_month(cru)
+
+
+def test_month_with_nothing_after_it_explains_itself():
+    with pytest.raises(InvalidExpense, match="needs a value"):
+        parse_args(["--month"])
+
+
+def test_an_unknown_flag_is_not_ignored():
+    # Silently ignoring a typo'd flag means the program does something other
+    # than what was asked and says nothing about it.
+    with pytest.raises(InvalidExpense, match="Unknown option"):
+        parse_args(["--evrything"])

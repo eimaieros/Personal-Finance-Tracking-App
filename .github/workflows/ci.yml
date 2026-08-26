@@ -23,19 +23,34 @@ jobs:
       - run: pip install pytest
       - run: pytest -q
 
-      # The program reads the ledger on startup, and the sample row shipped in
-      # expenses.csv is deliberately in the old emoji format so the migration
-      # path is exercised by anyone who clones this. If normalise_category
-      # ever stops recognising it, the summary silently loses the row — a
-      # green test suite would not notice, because the tests use tmp_path.
-      #
-      # An empty name ends the input loop, so this runs the whole program
-      # without a terminal and asserts the sample row survived.
+      # The shipped expenses.csv holds one row in the FIRST version's format —
+      # three columns, an emoji category, no date. It is there on purpose so
+      # that anyone who clones this exercises the migration path on their first
+      # run. The tests all use tmp_path, so if normalise_category ever stopped
+      # recognising that row the suite would stay green while the program
+      # silently dropped it.
       - name: The shipped ledger still reads
         run: |
-          saida=$(printf '\n' | python expense_tracker.py)
+          saida=$(printf '\n' | python expense_tracker.py --all --summary)
           echo "$saida"
           echo "$saida" | grep -q "25.00 EUR" || {
             echo "::error::a linha de exemplo em expenses.csv deixou de ser lida"
+            exit 1
+          }
+
+      # The summary defaults to the current month. Before that default existed
+      # it summed the whole file and divided by today's date, which is right
+      # for exactly as long as the file holds one month. This asserts the
+      # window is real: an undated row must NOT appear in a month.
+      - name: The month window is a real window
+        run: |
+          saida=$(printf '\n' | python expense_tracker.py --summary)
+          echo "$saida"
+          echo "$saida" | grep -q "Nothing recorded in" || {
+            echo "::error::a linha sem data entrou num mês onde não devia estar"
+            exit 1
+          }
+          echo "$saida" | grep -q -- "--all" || {
+            echo "::error::um beco sem saída não é uma resposta: falta apontar o --all"
             exit 1
           }
