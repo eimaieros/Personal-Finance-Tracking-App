@@ -23,6 +23,12 @@ jobs:
       - run: pip install pytest
       - run: pytest -q
 
+      # O README diz quantos testes ha, em quatro sitios. Nenhum deles estava a
+      # ser re-medido, e os quatro ficaram para tras quando a suite cresceu.
+      # Um numero em prosa e uma medicao sem instrumento; este e o instrumento.
+      - name: O README ainda diz o numero certo de testes
+        run: python3 tools/contagem.py
+
       # The shipped expenses.csv holds one row in the FIRST version's format —
       # three columns, an emoji category, no date. It is there on purpose so
       # that anyone who clones this exercises the migration path on their first
