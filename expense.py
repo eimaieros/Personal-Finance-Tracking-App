@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import datetime
-import math
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 # The categories, and the order they are offered in. Kept here rather than in
 # the UI because the CSV stores the category name verbatim: change a label and
@@ -17,6 +17,8 @@ CATEGORIES: tuple[str, ...] = (
     "Clothing",
     "Supermarket",
 )
+
+CENT = Decimal("0.01")
 
 
 class InvalidExpense(ValueError):
@@ -34,7 +36,7 @@ class Expense:
 
     name: str
     category: str
-    amount: float
+    amount: Decimal
 
     # Optional because a ledger written by the first version has no date
     # column at all, and refusing to read those rows would mean the fix threw
@@ -50,8 +52,10 @@ class Expense:
                 f"Unknown category {self.category!r}. "
                 f"Expected one of: {', '.join(CATEGORIES)}."
             )
-        if not math.isfinite(self.amount) or self.amount <= 0:
+        amount = normalise_amount(self.amount)
+        if amount <= 0:
             raise InvalidExpense("An amount has to be greater than zero.")
+        object.__setattr__(self, "amount", amount)
 
     def __repr__(self) -> str:
         # The original printed a dollar sign here while the summary printed
@@ -62,10 +66,34 @@ class Expense:
         return f"<Expense: {self.name}, {self.category}, {self.amount:.2f} EUR{quando}>"
 
 
-def parse_amount(raw: str) -> float:
+def normalise_amount(value: object) -> Decimal:
+    """Return a finite, positive monetary value rounded to one cent.
+
+    Floats are converted through their human-readable decimal form rather
+    than their binary expansion.  That keeps callers from the first version
+    working without letting ``0.1 + 0.2`` leak into the ledger.
+    """
+    if isinstance(value, bool):
+        raise InvalidExpense("An amount has to be a number.")
+    try:
+        amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        raise InvalidExpense("An amount has to be a number.") from None
+    if not amount.is_finite():
+        raise InvalidExpense("An amount has to be greater than zero.")
+    try:
+        amount = amount.quantize(CENT, rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        raise InvalidExpense("An amount is too large.") from None
+    if amount <= 0:
+        raise InvalidExpense("An amount has to be greater than zero.")
+    return amount
+
+
+def parse_amount(raw: str) -> Decimal:
     """Read an amount the way a person in Portugal would type it.
 
-    `float("25,50")` raises. Half the world writes decimals with a comma, and
+    `Decimal("25,50")` raises. Half the world writes decimals with a comma, and
     the original crashed with a traceback on the most natural input a
     Portuguese user could give it. Thousands separators are stripped for the
     same reason.
@@ -82,13 +110,10 @@ def parse_amount(raw: str) -> float:
         cleaned = cleaned.replace(",", ".")
 
     try:
-        value = float(cleaned)
-    except ValueError:
+        value = Decimal(cleaned)
+    except InvalidOperation:
         raise InvalidExpense(f"{raw!r} is not a number.") from None
-
-    if not math.isfinite(value) or value <= 0:
-        raise InvalidExpense("An amount has to be greater than zero.")
-    return value
+    return normalise_amount(value)
 
 
 def parse_date(raw: str) -> datetime.date | None:

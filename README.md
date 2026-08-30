@@ -6,7 +6,7 @@ to a CSV, and it shows you where the money went.
 [![CI](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml/badge.svg)](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![59 tests](https://img.shields.io/badge/tests-59-brightgreen)
+![61 tests](https://img.shields.io/badge/tests-61-brightgreen)
 
 ```bash
 python expense_tracker.py                    # record, then summarise this month
@@ -46,7 +46,7 @@ and the program died on startup. One comma, permanent damage, no warning.
 the standard library since 1.5 and I did not reach for it, because writing a
 line with an f-string looked simpler and was — right up until it wasn't.
 
-### `float("25,50")` raises, and that is how the amount is written here
+### Money is decimal, not binary floating point
 
 I am Portuguese. The decimal separator is a comma. The program crashed with a
 traceback on the most natural input its author could give it, which is a good
@@ -54,6 +54,10 @@ demonstration of why you test with something other than the happy path you had
 in mind while writing.
 
 `parse_amount` now reads `25,50`, `25.50`, `1.234,56`, `1,234.56` and `25,50 €`.
+It returns `Decimal`, rounds once to cents with `ROUND_HALF_UP`, and keeps sums
+exact: `0.10 + 0.20` is `0.30`, not a nearby binary approximation.  Existing
+callers can still pass ints and floats; values are normalised at the model
+boundary before anything reaches the CSV ledger.
 
 ### Every prompt was one typo away from losing your work
 
@@ -101,7 +105,7 @@ and the daily average is only printed for the window where it means something.
 
 ```bash
 pip install pytest
-pytest -q          # 59 tests
+pytest -q          # 61 tests
 ```
 
 Every test corresponds to something that was actually broken. A test that could
@@ -122,7 +126,7 @@ Two of them are worth pointing at:
 ```
 expense.py                 the Expense model, the categories, amount parsing
 expense_tracker.py         prompts, the CSV, the summary
-test_expense_tracker.py    59 tests
+test_expense_tracker.py    61 tests
 expenses.csv               the ledger — one sample row, in the old format on
                            purpose, so the migration is visible
 ```

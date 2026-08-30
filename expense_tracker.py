@@ -11,6 +11,7 @@ import calendar
 import csv
 import datetime
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 from expense import CATEGORIES, Expense, InvalidExpense, parse_amount, parse_date
@@ -191,7 +192,7 @@ def read(path: Path) -> list[Expense]:
                 out.append(Expense(
                     name=row[0],
                     category=normalise_category(row[2]),
-                    amount=float(row[1]),
+                    amount=parse_amount(row[1]),
                     # Column 3 exists only in files written by the current
                     # version. Rows from the first one keep date=None.
                     date=parse_date(row[3]) if len(row) > 3 else None,
@@ -261,11 +262,11 @@ def summarise(path: Path, month: tuple[int, int] | None = None) -> None:
             print(f"  ({sem_data} row(s) have no date — try --all.)")
         return
 
-    by_category: dict[str, float] = {}
+    by_category: dict[str, Decimal] = {}
     for e in expenses:
-        by_category[e.category] = by_category.get(e.category, 0.0) + e.amount
+        by_category[e.category] = by_category.get(e.category, Decimal("0")) + e.amount
 
-    total = sum(e.amount for e in expenses)
+    total = sum((e.amount for e in expenses), start=Decimal("0"))
     largest = max(len(c) for c in by_category)
     largest = max(largest, len("Per day so far"))
 

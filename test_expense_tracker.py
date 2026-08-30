@@ -9,6 +9,7 @@ nothing about the program.
 
 import csv
 import datetime
+from decimal import Decimal
 
 import pytest
 
@@ -51,16 +52,25 @@ def test_awkward_names_survive_a_round_trip(tmp_path, nome):
 # ── the bug a Portuguese user hits first ─────────────────────────────────────
 
 @pytest.mark.parametrize("cru,esperado", [
-    ("25.50", 25.50),
-    ("25,50", 25.50),          # how it is written here — float() raises on this
-    (" 25,50 ", 25.50),
-    ("25,50 €", 25.50),
-    ("1.234,56", 1234.56),     # Portuguese thousands separator
-    ("1,234.56", 1234.56),     # English thousands separator
-    ("7", 7.0),
+    ("25.50", Decimal("25.50")),
+    ("25,50", Decimal("25.50")),
+    (" 25,50 ", Decimal("25.50")),
+    ("25,50 €", Decimal("25.50")),
+    ("1.234,56", Decimal("1234.56")),
+    ("1,234.56", Decimal("1234.56")),
+    ("7", Decimal("7.00")),
 ])
 def test_amounts_are_read_the_way_people_write_them(cru, esperado):
-    assert parse_amount(cru) == pytest.approx(esperado)
+    assert parse_amount(cru) == esperado
+
+
+def test_binary_float_noise_never_reaches_the_ledger():
+    amount = Expense(name="x", category="Various", amount=0.1 + 0.2).amount
+    assert amount == Decimal("0.30")
+
+
+def test_half_a_cent_rounds_up_for_money():
+    assert parse_amount("1.005") == Decimal("1.01")
 
 
 @pytest.mark.parametrize("cru", [
@@ -199,7 +209,7 @@ def test_the_old_emoji_categories_still_read(tmp_path):
     )
     lidas = read(ledger)
     assert [e.category for e in lidas] == ["Clothing", "Transport", "Restaurants"]
-    assert sum(e.amount for e in lidas) == pytest.approx(46.20)
+    assert sum(e.amount for e in lidas) == Decimal("46.20")
 
 
 def test_an_unknown_category_is_still_skipped(tmp_path, capsys):
