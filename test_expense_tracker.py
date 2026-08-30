@@ -63,7 +63,10 @@ def test_amounts_are_read_the_way_people_write_them(cru, esperado):
     assert parse_amount(cru) == pytest.approx(esperado)
 
 
-@pytest.mark.parametrize("cru", ["", "abc", "-5", "0", "1,2,3"])
+@pytest.mark.parametrize("cru", [
+    "", "abc", "-5", "0", "1,2,3",
+    "nan", "inf", "-inf", "1e309",
+])
 def test_bad_amounts_raise_something_a_human_can_read(cru):
     with pytest.raises(InvalidExpense):
         parse_amount(cru)
@@ -84,6 +87,12 @@ def test_an_expense_needs_a_known_category():
 def test_an_expense_needs_a_positive_amount():
     with pytest.raises(InvalidExpense):
         Expense(name="x", category="Various", amount=0)
+
+
+@pytest.mark.parametrize("amount", [float("nan"), float("inf")])
+def test_an_expense_refuses_non_finite_amounts(amount):
+    with pytest.raises(InvalidExpense):
+        Expense(name="x", category="Various", amount=amount)
 
 
 def test_an_expense_cannot_be_changed_after_it_exists():
@@ -143,6 +152,20 @@ def test_the_header_is_written_exactly_once(tmp_path):
     assert linhas[0][0] == "name"
     assert sum(1 for l in linhas if l and l[0] == "name") == 1
     assert len(linhas) == 4
+
+
+def test_append_preserves_an_explicit_date(tmp_path):
+    ledger = tmp_path / "expenses.csv"
+    append(
+        Expense(
+            name="historic",
+            category="Various",
+            amount=1.0,
+            date=datetime.date(2024, 2, 29),
+        ),
+        ledger,
+    )
+    assert read(ledger)[0].date == datetime.date(2024, 2, 29)
 
 
 def test_totals_add_up(tmp_path, capsys):

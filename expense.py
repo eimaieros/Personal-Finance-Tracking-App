@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 from dataclasses import dataclass
 
 # The categories, and the order they are offered in. Kept here rather than in
@@ -49,7 +50,7 @@ class Expense:
                 f"Unknown category {self.category!r}. "
                 f"Expected one of: {', '.join(CATEGORIES)}."
             )
-        if self.amount <= 0:
+        if not math.isfinite(self.amount) or self.amount <= 0:
             raise InvalidExpense("An amount has to be greater than zero.")
 
     def __repr__(self) -> str:
@@ -85,7 +86,7 @@ def parse_amount(raw: str) -> float:
     except ValueError:
         raise InvalidExpense(f"{raw!r} is not a number.") from None
 
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         raise InvalidExpense("An amount has to be greater than zero.")
     return value
 

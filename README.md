@@ -6,7 +6,7 @@ to a CSV, and it shows you where the money went.
 [![CI](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml/badge.svg)](https://github.com/eimaieros/Personal-Finance-Tracking-App/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![52 tests](https://img.shields.io/badge/tests-52-brightgreen)
+![59 tests](https://img.shields.io/badge/tests-59-brightgreen)
 
 ```bash
 python expense_tracker.py                    # record, then summarise this month
@@ -101,7 +101,7 @@ and the daily average is only printed for the window where it means something.
 
 ```bash
 pip install pytest
-pytest -q          # 52 tests
+pytest -q          # 59 tests
 ```
 
 Every test corresponds to something that was actually broken. A test that could
@@ -122,7 +122,7 @@ Two of them are worth pointing at:
 ```
 expense.py                 the Expense model, the categories, amount parsing
 expense_tracker.py         prompts, the CSV, the summary
-test_expense_tracker.py    52 tests
+test_expense_tracker.py    59 tests
 expenses.csv               the ledger — one sample row, in the old format on
                            purpose, so the migration is visible
 ```

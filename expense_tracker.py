@@ -168,7 +168,7 @@ def append(expense: Expense, path: Path) -> None:
             expense.name,
             f"{expense.amount:.2f}",
             expense.category,
-            datetime.date.today().isoformat(),
+            (expense.date or datetime.date.today()).isoformat(),
         ])
 
 
